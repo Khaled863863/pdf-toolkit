@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word to PDF — Convert DOCX to PDF | PDF Toolkit</title>
+<meta name="description" content="Convert Word DOCX files to PDF online for free. Runs in your browser.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
+<script src="https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>Word to PDF</h1>
+    <p>Upload a .docx file and convert it to PDF. Basic formatting (headings, lists, bold, italic, tables, images) is preserved.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">D</div>
+    <h2>Drop a DOCX file here</h2>
+    <p>or click to select</p>
+    <button class="btn" type="button">Select File</button>
+    <input type="file" id="fileInput" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn" disabled>Convert to PDF</button>
+  </div>
+
+  <div id="preview" style="display:none;background:white;border:1px solid var(--border);border-radius:8px;padding:30px;margin-top:20px;max-width:780px;margin-left:auto;margin-right:auto;font-family:Georgia,serif;line-height:1.6"></div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script>
+(function(){
+  const zone=document.getElementById('dropZone'),input=document.getElementById('fileInput'),
+    list=document.getElementById('fileList'),runBtn=document.getElementById('runBtn'),
+    status=document.getElementById('status'),progress=document.getElementById('progress'),
+    preview=document.getElementById('preview');
+  let file=null;
+  setupDropZone(zone,input,inc=>{
+    const doc=inc.find(f=>/\.docx$/i.test(f.name));
+    if(!doc)return setStatus(status,'Please select a .docx file.','error');
+    file=doc;
+    list.innerHTML=`<div class="file-item"><span>D</span><span class="name">${doc.name}</span><span class="size">${formatBytes(doc.size)}</span></div>`;
+    runBtn.disabled=false;setStatus(status,'Ready.','info');
+  });
+  runBtn.addEventListener('click',async()=>{
+    if(!file)return;
+    runBtn.disabled=true;setStatus(status,'Parsing Word document…','info');setProgress(progress,20);
+    try{
+      const buf=await file.arrayBuffer();
+      const result=await mammoth.convertToHtml({arrayBuffer:buf});
+      preview.innerHTML=result.value;preview.style.display='';
+      setProgress(progress,60);setStatus(status,'Generating PDF…','info');
+      await html2pdf().set({
+        margin:[15,15,15,15],
+        filename:file.name.replace(/\.docx$/i,'')+'.pdf',
+        image:{type:'jpeg',quality:.95},
+        html2canvas:{scale:2,useCORS:true},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+      }).from(preview).save();
+      setProgress(progress,100);
+      setStatus(status,'✓ PDF downloaded!','success');
+    }catch(err){console.error(err);setStatus(status,'Error: '+err.message,'error');}
+    finally{runBtn.disabled=false;}
+  });
+})();
+</script>
+</body>
+</html>

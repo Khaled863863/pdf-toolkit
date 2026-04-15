@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unlock PDF — Remove PDF Password | PDF Toolkit</title>
+<meta name="description" content="Remove the password from a PDF (if you know the password).">
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>Unlock PDF</h1>
+    <p>Removes password protection from a PDF that you own. You must know the password — this is not a cracking tool.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">🔓</div>
+    <h2>Drop a PDF here</h2>
+    <p>or click to select</p>
+    <button class="btn" type="button">Select File</button>
+    <input type="file" id="fileInput" accept="application/pdf">
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="options" id="options" style="display:none">
+    <div>
+      <label>Password</label>
+      <input type="password" id="pw" placeholder="Enter PDF password">
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn" disabled>Unlock &amp; Download</button>
+  </div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';</script>
+<script>
+(function(){
+  const zone=document.getElementById('dropZone'),input=document.getElementById('fileInput'),
+    list=document.getElementById('fileList'),options=document.getElementById('options'),
+    pw=document.getElementById('pw'),runBtn=document.getElementById('runBtn'),
+    status=document.getElementById('status'),progress=document.getElementById('progress');
+  let file=null;
+  setupDropZone(zone,input,inc=>{
+    const pdf=inc.find(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
+    if(!pdf)return setStatus(status,'Please select a PDF.','error');
+    file=pdf;
+    list.innerHTML=`<div class="file-item"><span>🔓</span><span class="name">${pdf.name}</span><span class="size">${formatBytes(pdf.size)}</span></div>`;
+    options.style.display='';runBtn.disabled=false;setStatus(status,'Enter the password.','info');
+  });
+  runBtn.addEventListener('click',async()=>{
+    if(!file)return;
+    runBtn.disabled=true;setStatus(status,'Opening with password…','info');setProgress(progress,20);
+    try{
+      const buf=await file.arrayBuffer();
+      const src=await pdfjsLib.getDocument({data:buf.slice(0),password:pw.value}).promise;
+      const {PDFDocument}=PDFLib;
+      const out=await PDFDocument.create();
+      const canvas=document.createElement('canvas');
+      const ctx=canvas.getContext('2d');
+      for(let i=1;i<=src.numPages;i++){
+        const page=await src.getPage(i);
+        const vp=page.getViewport({scale:2});
+        canvas.width=vp.width;canvas.height=vp.height;
+        ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);
+        await page.render({canvasContext:ctx,viewport:vp}).promise;
+        const dataUrl=canvas.toDataURL('image/jpeg',.92);
+        const b=await fetch(dataUrl).then(r=>r.arrayBuffer());
+        const img=await out.embedJpg(b);
+        const p=out.addPage([vp.width,vp.height]);
+        p.drawImage(img,{x:0,y:0,width:vp.width,height:vp.height});
+        setProgress(progress,20+(i/src.numPages)*75);
+      }
+      const data=await out.save();
+      setProgress(progress,100);
+      download(new Blob([data],{type:'application/pdf'}),file.name.replace(/\.pdf$/i,'')+'_unlocked.pdf');
+      setStatus(status,'✓ Unlocked! Note: pages were re-rendered as images to strip the password.','success');
+    }catch(err){
+      const msg=(''+err).toLowerCase().includes('password')?'Wrong password or missing password.':(err.message||err);
+      setStatus(status,'Error: '+msg,'error');
+    }
+    finally{runBtn.disabled=false;}
+  });
+})();
+</script>
+</body>
+</html>

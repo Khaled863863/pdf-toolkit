@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protect PDF — Mark as Confidential | PDF Toolkit</title>
+<meta name="description" content="Add a visible CONFIDENTIAL stamp and metadata flags to a PDF.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>Protect PDF</h1>
+    <p>True PDF password encryption requires a server-side tool. This free browser version stamps a visible CONFIDENTIAL watermark on every page and sets restrictive metadata. For AES-256 password encryption, use our desktop partner tools.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">🔒</div>
+    <h2>Drop a PDF here</h2>
+    <p>or click to select</p>
+    <button class="btn" type="button">Select File</button>
+    <input type="file" id="fileInput" accept="application/pdf">
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="options" id="options" style="display:none">
+    <div>
+      <label>Stamp text</label>
+      <input type="text" id="stamp" value="CONFIDENTIAL — DO NOT DISTRIBUTE">
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn" disabled>Protect &amp; Download</button>
+  </div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script>
+(function(){
+  const zone=document.getElementById('dropZone'),input=document.getElementById('fileInput'),
+    list=document.getElementById('fileList'),options=document.getElementById('options'),
+    stamp=document.getElementById('stamp'),runBtn=document.getElementById('runBtn'),
+    status=document.getElementById('status'),progress=document.getElementById('progress');
+  let file=null;
+  setupDropZone(zone,input,inc=>{
+    const pdf=inc.find(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
+    if(!pdf)return setStatus(status,'Please select a PDF.','error');
+    file=pdf;
+    list.innerHTML=`<div class="file-item"><span>🔒</span><span class="name">${pdf.name}</span><span class="size">${formatBytes(pdf.size)}</span></div>`;
+    options.style.display='';runBtn.disabled=false;setStatus(status,'Ready.','info');
+  });
+  runBtn.addEventListener('click',async()=>{
+    if(!file)return;
+    runBtn.disabled=true;setStatus(status,'Stamping PDF…','info');setProgress(progress,25);
+    try{
+      const {PDFDocument,StandardFonts,rgb,degrees}=PDFLib;
+      const bytes=await file.arrayBuffer();
+      const doc=await PDFDocument.load(bytes,{ignoreEncryption:true});
+      const font=await doc.embedFont(StandardFonts.HelveticaBold);
+      const t=stamp.value||'CONFIDENTIAL';
+      doc.setSubject('Confidential document');
+      doc.setKeywords(['confidential','restricted']);
+      doc.setProducer('PDF Toolkit');
+      doc.getPages().forEach(p=>{
+        const {width,height}=p.getSize();
+        const fs=Math.max(24,width/20);
+        const tw=font.widthOfTextAtSize(t,fs);
+        p.drawText(t,{x:(width-tw)/2,y:height/2,size:fs,font,color:rgb(.85,.1,.1),opacity:.22,rotate:degrees(-30)});
+      });
+      const out=await doc.save();
+      setProgress(progress,100);
+      download(new Blob([out],{type:'application/pdf'}),file.name.replace(/\.pdf$/i,'')+'_protected.pdf');
+      setStatus(status,'✓ Stamped and saved.','success');
+    }catch(err){setStatus(status,'Error: '+err.message,'error');}
+    finally{runBtn.disabled=false;}
+  });
+})();
+</script>
+</body>
+</html>

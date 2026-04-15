@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organize PDF — Reorder or Delete Pages | PDF Toolkit</title>
+<meta name="description" content="Reorder or delete pages of a PDF visually. Free and browser-based.">
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin-top:18px}
+  .thumb{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;
+    text-align:center;cursor:grab;position:relative;transition:transform .12s,box-shadow .12s}
+  .thumb:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px)}
+  .thumb.dragging{opacity:.4}
+  .thumb canvas{max-width:100%;height:auto;border:1px solid var(--border);background:white}
+  .thumb .num{display:block;margin-top:6px;font-size:13px;font-weight:600}
+  .thumb .del{position:absolute;top:6px;right:6px;background:var(--danger);color:white;border:none;
+    width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1}
+  .thumb.removed{opacity:.35;filter:grayscale(1)}
+</style>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>Organize PDF</h1>
+    <p>Drag thumbnails to reorder pages. Click × to delete. Then save your new PDF.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">☰</div>
+    <h2>Drop a PDF here</h2>
+    <p>or click to select</p>
+    <button class="btn" type="button">Select File</button>
+    <input type="file" id="fileInput" accept="application/pdf">
+  </div>
+
+  <div class="thumbs" id="thumbs"></div>
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn" disabled>Save Reordered PDF</button>
+  </div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';</script>
+<script>
+(function(){
+  const zone=document.getElementById('dropZone'),input=document.getElementById('fileInput'),
+    thumbs=document.getElementById('thumbs'),runBtn=document.getElementById('runBtn'),
+    status=document.getElementById('status'),progress=document.getElementById('progress');
+  let file=null,order=[],removed=new Set();
+
+  function render(){
+    thumbs.querySelectorAll('.thumb').forEach((el,i)=>{
+      el.dataset.order=i;
+      const orig=+el.dataset.orig;
+      el.classList.toggle('removed',removed.has(orig));
+      el.querySelector('.num').textContent=removed.has(orig)?'(deleted)':('Page '+(i+1));
+    });
+  }
+
+  setupDropZone(zone,input,async inc=>{
+    const pdf=inc.find(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
+    if(!pdf)return setStatus(status,'Please select a PDF.','error');
+    file=pdf;order=[];removed.clear();thumbs.innerHTML='';
+    setStatus(status,'Rendering thumbnails…','info');
+    const buf=await pdf.arrayBuffer();
+    const doc=await pdfjsLib.getDocument({data:buf}).promise;
+    for(let i=1;i<=doc.numPages;i++){
+      const page=await doc.getPage(i);
+      const vp=page.getViewport({scale:.3});
+      const c=document.createElement('canvas');
+      c.width=vp.width;c.height=vp.height;
+      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+      const el=document.createElement('div');
+      el.className='thumb';el.draggable=true;el.dataset.orig=i-1;
+      el.innerHTML=`<button class="del" title="Delete">×</button><span class="num">Page ${i}</span>`;
+      el.insertBefore(c,el.firstChild);
+      thumbs.appendChild(el);
+      order.push(i-1);
+      setProgress(progress,(i/doc.numPages)*100);
+    }
+    bindDrag();
+    runBtn.disabled=false;
+    setStatus(status,'Drag to reorder, click × to delete.','info');
+  });
+
+  function bindDrag(){
+    thumbs.querySelectorAll('.thumb').forEach(el=>{
+      el.addEventListener('dragstart',e=>{e.dataTransfer.setData('text',[...thumbs.children].indexOf(el));el.classList.add('dragging');});
+      el.addEventListener('dragend',()=>el.classList.remove('dragging'));
+      el.addEventListener('dragover',e=>e.preventDefault());
+      el.addEventListener('drop',e=>{
+        e.preventDefault();
+        const from=+e.dataTransfer.getData('text'),to=[...thumbs.children].indexOf(el);
+        if(from===to)return;
+        const node=thumbs.children[from];
+        thumbs.insertBefore(node,from<to?el.nextSibling:el);
+        render();
+      });
+      el.querySelector('.del').addEventListener('click',ev=>{
+        ev.stopPropagation();
+        const orig=+el.dataset.orig;
+        if(removed.has(orig))removed.delete(orig);else removed.add(orig);
+        render();
+      });
+    });
+  }
+
+  runBtn.addEventListener('click',async()=>{
+    if(!file)return;
+    runBtn.disabled=true;setStatus(status,'Building new PDF…','info');setProgress(progress,30);
+    try{
+      const {PDFDocument}=PDFLib;
+      const bytes=await file.arrayBuffer();
+      const src=await PDFDocument.load(bytes,{ignoreEncryption:true});
+      const out=await PDFDocument.create();
+      const indices=[...thumbs.children].map(el=>+el.dataset.orig).filter(i=>!removed.has(i));
+      if(!indices.length){setStatus(status,'All pages removed — nothing to save.','error');runBtn.disabled=false;return;}
+      const pages=await out.copyPages(src,indices);
+      pages.forEach(p=>out.addPage(p));
+      const data=await out.save();
+      setProgress(progress,100);
+      download(new Blob([data],{type:'application/pdf'}),file.name.replace(/\.pdf$/i,'')+'_organized.pdf');
+      setStatus(status,'✓ Done!','success');
+    }catch(err){setStatus(status,'Error: '+err.message,'error');}
+    finally{runBtn.disabled=false;}
+  });
+})();
+</script>
+</body>
+</html>

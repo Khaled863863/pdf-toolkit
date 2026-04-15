@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HTML to PDF | PDF Toolkit</title>
+<meta name="description" content="Convert HTML code or a .html file to a PDF document online.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://unpkg.com/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>HTML to PDF</h1>
+    <p>Paste HTML code or upload a .html file — we'll render it as a PDF.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="options">
+    <div>
+      <label>Paste your HTML</label>
+      <textarea id="htmlIn" rows="10" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px"
+        placeholder="<h1>Hello</h1>&#10;<p>Your HTML here…</p>"></textarea>
+    </div>
+    <div>
+      <label>…or upload a .html file</label>
+      <input type="file" id="fileInput" accept=".html,.htm,text/html">
+    </div>
+    <div>
+      <label>Filename</label>
+      <input type="text" id="filename" value="document.pdf">
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn">Convert to PDF</button>
+  </div>
+
+  <div id="preview" style="display:none;background:white;border:1px solid var(--border);border-radius:8px;padding:30px;margin-top:20px;max-width:780px;margin-left:auto;margin-right:auto"></div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script>
+(function(){
+  const htmlIn=document.getElementById('htmlIn'),file=document.getElementById('fileInput'),
+    fname=document.getElementById('filename'),runBtn=document.getElementById('runBtn'),
+    status=document.getElementById('status'),progress=document.getElementById('progress'),
+    preview=document.getElementById('preview');
+  file.addEventListener('change',async e=>{
+    const f=e.target.files[0];if(!f)return;
+    htmlIn.value=await f.text();
+    setStatus(status,'Loaded.','info');
+  });
+  runBtn.addEventListener('click',async()=>{
+    const html=htmlIn.value.trim();
+    if(!html)return setStatus(status,'Paste or upload some HTML first.','error');
+    runBtn.disabled=true;setStatus(status,'Rendering…','info');setProgress(progress,30);
+    try{
+      preview.innerHTML=html;preview.style.display='';
+      await html2pdf().set({
+        margin:[15,15,15,15],
+        filename:fname.value||'document.pdf',
+        image:{type:'jpeg',quality:.95},
+        html2canvas:{scale:2,useCORS:true},
+        jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+      }).from(preview).save();
+      setProgress(progress,100);setStatus(status,'✓ PDF downloaded!','success');
+    }catch(err){setStatus(status,'Error: '+err.message,'error');}
+    finally{runBtn.disabled=false;}
+  });
+})();
+</script>
+</body>
+</html>

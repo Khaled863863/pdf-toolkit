@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JPG to PDF — Convert Images to PDF | PDF Toolkit</title>
+<meta name="description" content="Convert JPG, PNG and other images to a single PDF. Free and private — 100% browser-based.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>JPG to PDF</h1>
+    <p>Turn your JPG or PNG images into a single PDF file. Drag to reorder.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">📷</div>
+    <h2>Drop images here</h2>
+    <p>JPG, PNG — select as many as you need</p>
+    <button class="btn" type="button">Select Images</button>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png" multiple>
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="options" id="options" style="display:none">
+    <div class="row">
+      <div>
+        <label>Page size</label>
+        <select id="pageSize">
+          <option value="fit" selected>Fit to image</option>
+          <option value="a4">A4 (210 × 297 mm)</option>
+          <option value="letter">US Letter (8.5 × 11 in)</option>
+        </select>
+      </div>
+      <div>
+        <label>Orientation</label>
+        <select id="orient">
+          <option value="auto" selected>Auto</option>
+          <option value="portrait">Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn" disabled>Convert to PDF</button>
+    <button class="btn btn-secondary" id="clearBtn">Clear</button>
+  </div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script src="../js/tools/jpg-to-pdf.js"></script>
+</body>
+</html>

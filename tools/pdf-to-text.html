@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF to Text — Extract Text from PDF | PDF Toolkit</title>
+<meta name="description" content="Extract plain text from any PDF online. Free and private.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>PDF to Text</h1>
+    <p>Pull the plain text content out of any PDF. Great for quoting or searching.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">T</div>
+    <h2>Drop a PDF here</h2>
+    <p>or click to select</p>
+    <button class="btn" type="button">Select File</button>
+    <input type="file" id="fileInput" accept="application/pdf">
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn" disabled>Extract Text</button>
+  </div>
+
+  <textarea id="output" style="display:none;width:100%;min-height:300px;margin-top:20px;padding:14px;border:1px solid var(--border);border-radius:8px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px" readonly></textarea>
+
+  <div class="actions" id="outActions" style="display:none">
+    <button class="btn" id="copyBtn">Copy to Clipboard</button>
+    <button class="btn btn-secondary" id="dlBtn">Download .txt</button>
+  </div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';</script>
+<script>
+(function(){
+  const zone=document.getElementById('dropZone'),input=document.getElementById('fileInput'),
+    list=document.getElementById('fileList'),runBtn=document.getElementById('runBtn'),
+    status=document.getElementById('status'),progress=document.getElementById('progress'),
+    output=document.getElementById('output'),outActions=document.getElementById('outActions'),
+    copyBtn=document.getElementById('copyBtn'),dlBtn=document.getElementById('dlBtn');
+  let file=null;
+  setupDropZone(zone,input,inc=>{
+    const pdf=inc.find(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
+    if(!pdf)return setStatus(status,'Please select a PDF.','error');
+    file=pdf;
+    list.innerHTML=`<div class="file-item"><span>T</span><span class="name">${pdf.name}</span><span class="size">${formatBytes(pdf.size)}</span></div>`;
+    runBtn.disabled=false;setStatus(status,'Ready.','info');
+  });
+  runBtn.addEventListener('click',async()=>{
+    if(!file)return;
+    runBtn.disabled=true;setStatus(status,'Extracting text…','info');setProgress(progress,10);
+    try{
+      const buf=await file.arrayBuffer();
+      const doc=await pdfjsLib.getDocument({data:buf}).promise;
+      let all='';
+      for(let i=1;i<=doc.numPages;i++){
+        const page=await doc.getPage(i);
+        const c=await page.getTextContent();
+        all+=c.items.map(it=>it.str).join(' ')+'\n\n';
+        setProgress(progress,10+(i/doc.numPages)*85);
+      }
+      output.value=all.trim();output.style.display='';outActions.style.display='';
+      setProgress(progress,100);setStatus(status,'✓ Text extracted.','success');
+    }catch(err){setStatus(status,'Error: '+err.message,'error');}
+    finally{runBtn.disabled=false;}
+  });
+  copyBtn.addEventListener('click',()=>{navigator.clipboard.writeText(output.value);setStatus(status,'Copied!','success');});
+  dlBtn.addEventListener('click',()=>{download(new Blob([output.value],{type:'text/plain'}),file.name.replace(/\.pdf$/i,'')+'.txt');});
+})();
+</script>
+</body>
+</html>

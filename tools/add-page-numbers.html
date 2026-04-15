@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Add Page Numbers to PDF | PDF Toolkit</title>
+<meta name="description" content="Insert page numbers into any PDF document online for free.">
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+<main class="tool-page container">
+  <a class="back-link" href="../index.html">← All tools</a>
+  <div class="tool-header">
+    <h1>Add Page Numbers</h1>
+    <p>Insert page numbers in the position you choose, in seconds.</p>
+  </div>
+
+  <div data-ad></div>
+
+  <div class="drop-zone" id="dropZone">
+    <div class="drop-icon">#</div>
+    <h2>Drop a PDF here</h2>
+    <p>or click to select</p>
+    <button class="btn" type="button">Select File</button>
+    <input type="file" id="fileInput" accept="application/pdf">
+  </div>
+
+  <div class="file-list" id="fileList"></div>
+
+  <div class="options" id="options" style="display:none">
+    <div class="row">
+      <div>
+        <label>Position</label>
+        <select id="pos">
+          <option value="bottom-center" selected>Bottom center</option>
+          <option value="bottom-right">Bottom right</option>
+          <option value="bottom-left">Bottom left</option>
+          <option value="top-center">Top center</option>
+          <option value="top-right">Top right</option>
+          <option value="top-left">Top left</option>
+        </select>
+      </div>
+      <div>
+        <label>Format</label>
+        <select id="format">
+          <option value="n" selected>1, 2, 3…</option>
+          <option value="nN">Page 1 of N</option>
+          <option value="n/N">1 / N</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Font size</label>
+        <input type="number" id="size" value="12" min="6" max="48">
+      </div>
+      <div>
+        <label>Start number</label>
+        <input type="number" id="start" value="1" min="1">
+      </div>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+  <div class="progress" id="progress"><div class="progress-bar"></div></div>
+
+  <div class="actions">
+    <button class="btn btn-success" id="runBtn" disabled>Add Numbers</button>
+  </div>
+
+  <div data-ad></div>
+</main>
+
+<script src="../js/app.js"></script>
+<script>
+(function(){
+  const zone=document.getElementById('dropZone'),input=document.getElementById('fileInput'),
+    list=document.getElementById('fileList'),options=document.getElementById('options'),
+    pos=document.getElementById('pos'),format=document.getElementById('format'),
+    size=document.getElementById('size'),start=document.getElementById('start'),
+    runBtn=document.getElementById('runBtn'),status=document.getElementById('status'),
+    progress=document.getElementById('progress');
+  let file=null;
+  setupDropZone(zone,input,inc=>{
+    const pdf=inc.find(f=>f.type==='application/pdf'||f.name.toLowerCase().endsWith('.pdf'));
+    if(!pdf)return setStatus(status,'Please select a PDF.','error');
+    file=pdf;
+    list.innerHTML=`<div class="file-item"><span>#</span><span class="name">${pdf.name}</span><span class="size">${formatBytes(pdf.size)}</span></div>`;
+    options.style.display='';runBtn.disabled=false;setStatus(status,'Ready.','info');
+  });
+  runBtn.addEventListener('click',async()=>{
+    if(!file)return;
+    runBtn.disabled=true;setStatus(status,'Adding page numbers…','info');setProgress(progress,20);
+    try{
+      const {PDFDocument,StandardFonts,rgb}=PDFLib;
+      const bytes=await file.arrayBuffer();
+      const doc=await PDFDocument.load(bytes,{ignoreEncryption:true});
+      const font=await doc.embedFont(StandardFonts.Helvetica);
+      const pages=doc.getPages();
+      const N=pages.length,s=+start.value||1,fs=+size.value;
+      pages.forEach((p,i)=>{
+        const n=s+i;
+        let txt=String(n);
+        if(format.value==='nN')txt=`Page ${n} of ${N}`;
+        else if(format.value==='n/N')txt=`${n} / ${N}`;
+        const {width,height}=p.getSize();
+        const tw=font.widthOfTextAtSize(txt,fs);
+        const margin=28;let x,y;
+        if(pos.value.endsWith('left'))x=margin;
+        else if(pos.value.endsWith('right'))x=width-tw-margin;
+        else x=(width-tw)/2;
+        y=pos.value.startsWith('bottom')?margin:height-margin-fs;
+        p.drawText(txt,{x,y,size:fs,font,color:rgb(0,0,0)});
+      });
+      const out=await doc.save();
+      setProgress(progress,100);
+      download(new Blob([out],{type:'application/pdf'}),file.name.replace(/\.pdf$/i,'')+'_numbered.pdf');
+      setStatus(status,'✓ Done!','success');
+    }catch(err){setStatus(status,'Error: '+err.message,'error');}
+    finally{runBtn.disabled=false;}
+  });
+})();
+</script>
+</body>
+</html>
